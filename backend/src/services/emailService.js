@@ -32,11 +32,11 @@ class EmailService {
         transportConfig.secure = false; // true for 465, false for other ports
         transportConfig.requireTLS = true;
       } else if (process.env.EMAIL_SERVICE === 'gmail') {
-        transportConfig.service = 'gmail';
-        transportConfig.secure = false;
-        transportConfig.requireTLS = true;
+        // Use explicit SMTP configuration for Gmail
         transportConfig.host = 'smtp.gmail.com';
         transportConfig.port = 587;
+        transportConfig.secure = false;
+        transportConfig.requireTLS = true;
         // Enhanced configuration for cloud deployment
         transportConfig.connectionTimeout = 60000; // 60 seconds
         transportConfig.greetingTimeout = 30000; // 30 seconds
@@ -44,19 +44,24 @@ class EmailService {
         transportConfig.tls = {
           rejectUnauthorized: false
         };
+        // Don't use the 'service' property, use explicit SMTP settings
       } else {
-        // Default to Gmail
-        transportConfig.service = process.env.EMAIL_SERVICE || 'gmail';
+        // Default to Gmail with explicit SMTP settings
+        transportConfig.host = 'smtp.gmail.com';
+        transportConfig.port = 587;
+        transportConfig.secure = false;
+        transportConfig.requireTLS = true;
       }
 
       this.transporter = nodemailer.createTransport(transportConfig);
       
       console.log('🔧 Transport config:', {
-        service: transportConfig.service,
         host: transportConfig.host,
         port: transportConfig.port,
         secure: transportConfig.secure,
-        user: transportConfig.auth.user
+        requireTLS: transportConfig.requireTLS,
+        user: transportConfig.auth.user,
+        hasPassword: !!transportConfig.auth.pass
       });
 
       console.log(`✅ Email service (${process.env.EMAIL_SERVICE || 'gmail'}) initialized successfully`);
@@ -158,9 +163,18 @@ class EmailService {
     }
 
     try {
+      console.log('🔍 Starting email connection test...');
+      console.log('📧 Testing with user:', process.env.EMAIL_USER);
+      console.log('📧 Password length:', process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0);
+      
       await this.transporter.verify();
+      console.log('✅ Email connection verification successful');
       return { success: true, message: 'Email service is ready' };
     } catch (error) {
+      console.error('❌ Email connection verification failed');
+      console.error('❌ Error code:', error.code);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error response:', error.response);
       return { success: false, message: error.message };
     }
   }
