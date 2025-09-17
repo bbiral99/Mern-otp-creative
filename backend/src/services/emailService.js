@@ -30,6 +30,14 @@ class EmailService {
         transportConfig.service = 'gmail';
         transportConfig.secure = false; // true for 465, false for other ports
         transportConfig.requireTLS = true;
+        // Enhanced configuration for cloud deployment
+        transportConfig.connectionTimeout = 60000; // 60 seconds
+        transportConfig.greetingTimeout = 30000; // 30 seconds
+        transportConfig.socketTimeout = 60000; // 60 seconds
+        transportConfig.tls = {
+          ciphers: 'SSLv3',
+          rejectUnauthorized: false
+        };
       } else {
         // Default to Gmail
         transportConfig.service = process.env.EMAIL_SERVICE || 'gmail';
@@ -72,7 +80,7 @@ class EmailService {
                 <h1 style="font-size: 36px; letter-spacing: 8px; margin: 0; color: #4285f4; font-family: 'Courier New', monospace;">${otp}</h1>
               </div>
               <p style="color: #666; text-align: center; margin: 20px 0;">
-                This code will expire in <strong>10 minutes</strong>. Please do not share this code with anyone.
+                This code will expire in <strong>5 minutes</strong>. Please do not share this code with anyone.
               </p>
               <div style="background: #e8f0fe; border: 1px solid #4285f4; border-radius: 4px; padding: 12px; margin: 20px 0;">
                 <p style="color: #1565c0; margin: 0; font-size: 14px; text-align: center;">
