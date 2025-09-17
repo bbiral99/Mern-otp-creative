@@ -18,64 +18,72 @@ class EmailService {
     }
 
     try {
+      // Gmail SMTP configuration optimized for cloud deployment
       const transportConfig = {
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false, // use TLS
+        requireTLS: true,
         auth: {
           user: process.env.EMAIL_USER,
           pass: process.env.EMAIL_PASS
+        },
+        // Cloud deployment optimizations
+        connectionTimeout: 30000, // 30 seconds
+        greetingTimeout: 10000, // 10 seconds
+        socketTimeout: 30000, // 30 seconds
+        pool: true,
+        maxConnections: 1,
+        tls: {
+          rejectUnauthorized: false,
+          servername: 'smtp.gmail.com'
         }
       };
 
-      // Configure based on email service
-      if (process.env.EMAIL_SERVICE === 'yahoo') {
-        transportConfig.host = process.env.EMAIL_HOST || 'smtp.mail.yahoo.com';
-        transportConfig.port = parseInt(process.env.EMAIL_PORT) || 587;
-        transportConfig.secure = false; // true for 465, false for other ports
-        transportConfig.requireTLS = true;
-      } else if (process.env.EMAIL_SERVICE === 'gmail') {
-        // Use explicit SMTP configuration for Gmail
-        transportConfig.host = 'smtp.gmail.com';
-        transportConfig.port = 587;
-        transportConfig.secure = false;
-        transportConfig.requireTLS = true;
-        // Enhanced configuration for cloud deployment
-        transportConfig.connectionTimeout = 60000; // 60 seconds
-        transportConfig.greetingTimeout = 30000; // 30 seconds
-        transportConfig.socketTimeout = 60000; // 60 seconds
-        transportConfig.tls = {
-          rejectUnauthorized: false
-        };
-        // Don't use the 'service' property, use explicit SMTP settings
-      } else {
-        // Default to Gmail with explicit SMTP settings
-        transportConfig.host = 'smtp.gmail.com';
-        transportConfig.port = 587;
-        transportConfig.secure = false;
-        transportConfig.requireTLS = true;
-      }
+      console.log('🔧 Gmail SMTP Configuration:');
+      console.log('   Host: smtp.gmail.com');
+      console.log('   Port: 587');
+      console.log('   Secure: false');
+      console.log('   Auth User:', process.env.EMAIL_USER);
+      console.log('   Password Length:', process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0);
 
       this.transporter = nodemailer.createTransport(transportConfig);
-      
-      console.log('🔧 Transport config:', {
-        host: transportConfig.host,
-        port: transportConfig.port,
-        secure: transportConfig.secure,
-        requireTLS: transportConfig.requireTLS,
-        user: transportConfig.auth.user,
-        hasPassword: !!transportConfig.auth.pass
-      });
-
-      console.log(`✅ Email service (${process.env.EMAIL_SERVICE || 'gmail'}) initialized successfully`);
+      console.log('✅ Email transporter created successfully');
       
       // Test the connection immediately
       this.testConnection().then(result => {
         if (result.success) {
-          console.log('✅ Email connection test passed');
+          console.log('✅ Initial email connection test passed');
         } else {
-          console.error('❌ Email connection test failed:', result.message);
+          console.error('❌ Initial email connection test failed:', result.message);
         }
+      }).catch(err => {
+        console.error('❌ Error during initial connection test:', err.message);
       });
+      
     } catch (error) {
       console.error('❌ Failed to initialize email service:', error.message);
+      console.error('❌ Error stack:', error.stack);
+      
+      // Try alternative configuration for cloud environments
+      console.log('🔄 Trying alternative cloud-optimized configuration...');
+      try {
+        const altConfig = {
+          service: 'gmail',
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
+          },
+          tls: {
+            rejectUnauthorized: false
+          }
+        };
+        
+        this.transporter = nodemailer.createTransport(altConfig);
+        console.log('✅ Alternative email configuration applied');
+      } catch (altError) {
+        console.error('❌ Alternative configuration also failed:', altError.message);
+      }
     }
   }
 
@@ -159,23 +167,44 @@ class EmailService {
 
   async testConnection() {
     if (!this.transporter) {
+      console.log('❌ No transporter available for testing');
       return { success: false, message: 'Email service not configured' };
     }
 
     try {
-      console.log('🔍 Starting email connection test...');
-      console.log('📧 Testing with user:', process.env.EMAIL_USER);
-      console.log('📧 Password length:', process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0);
+      console.log('🔍 Starting Gmail SMTP connection test...');
+      console.log('📧 Testing connection to: smtp.gmail.com:587');
+      console.log('📧 Auth user:', process.env.EMAIL_USER);
       
-      await this.transporter.verify();
-      console.log('✅ Email connection verification successful');
-      return { success: true, message: 'Email service is ready' };
+      // Use a shorter timeout for faster feedback
+      const testResult = await Promise.race([
+        this.transporter.verify(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Connection test timeout after 15 seconds')), 15000)
+        )
+      ]);
+      
+      console.log('✅ Gmail SMTP connection verification successful!');
+      return { success: true, message: 'Gmail SMTP connection is ready' };
     } catch (error) {
-      console.error('❌ Email connection verification failed');
-      console.error('❌ Error code:', error.code);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error response:', error.response);
-      return { success: false, message: error.message };
+      console.error('❌ Gmail SMTP connection verification failed');
+      console.error('❌ Error details:');
+      console.error('   Code:', error.code);
+      console.error('   Message:', error.message);
+      console.error('   Command:', error.command);
+      
+      // Provide specific guidance based on error type
+      let guidance = '';
+      if (error.code === 'ETIMEDOUT') {
+        guidance = 'Network timeout - check if Gmail SMTP is accessible from your deployment environment';
+      } else if (error.code === 'EAUTH') {
+        guidance = 'Authentication failed - check your Gmail app password';
+      } else if (error.code === 'ECONNECTION') {
+        guidance = 'Connection refused - check network connectivity';
+      }
+      
+      console.error('   Guidance:', guidance);
+      return { success: false, message: error.message, code: error.code, guidance };
     }
   }
 }
