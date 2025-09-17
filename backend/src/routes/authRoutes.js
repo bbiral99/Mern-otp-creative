@@ -28,4 +28,7 @@ router.post('/logout', authController.logout);
 // Test email configuration
 router.get('/test-email', authController.testEmail);
 
+// Test send actual OTP email
+router.post('/test-send-email', authController.testSendEmail);
+
 module.exports = router;

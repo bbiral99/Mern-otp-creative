@@ -7,6 +7,11 @@ class EmailService {
   }
 
   initializeTransporter() {
+    console.log('🔧 Initializing email transporter...');
+    console.log('📧 EMAIL_USER:', process.env.EMAIL_USER);
+    console.log('📧 EMAIL_SERVICE:', process.env.EMAIL_SERVICE);
+    console.log('📧 EMAIL_PASS configured:', !!process.env.EMAIL_PASS);
+    
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
       console.log('⚠️  Email credentials not configured. OTPs will be logged to console only.');
       return;
@@ -28,14 +33,15 @@ class EmailService {
         transportConfig.requireTLS = true;
       } else if (process.env.EMAIL_SERVICE === 'gmail') {
         transportConfig.service = 'gmail';
-        transportConfig.secure = false; // true for 465, false for other ports
+        transportConfig.secure = false;
         transportConfig.requireTLS = true;
+        transportConfig.host = 'smtp.gmail.com';
+        transportConfig.port = 587;
         // Enhanced configuration for cloud deployment
         transportConfig.connectionTimeout = 60000; // 60 seconds
         transportConfig.greetingTimeout = 30000; // 30 seconds
         transportConfig.socketTimeout = 60000; // 60 seconds
         transportConfig.tls = {
-          ciphers: 'SSLv3',
           rejectUnauthorized: false
         };
       } else {
@@ -44,8 +50,25 @@ class EmailService {
       }
 
       this.transporter = nodemailer.createTransport(transportConfig);
+      
+      console.log('🔧 Transport config:', {
+        service: transportConfig.service,
+        host: transportConfig.host,
+        port: transportConfig.port,
+        secure: transportConfig.secure,
+        user: transportConfig.auth.user
+      });
 
       console.log(`✅ Email service (${process.env.EMAIL_SERVICE || 'gmail'}) initialized successfully`);
+      
+      // Test the connection immediately
+      this.testConnection().then(result => {
+        if (result.success) {
+          console.log('✅ Email connection test passed');
+        } else {
+          console.error('❌ Email connection test failed:', result.message);
+        }
+      });
     } catch (error) {
       console.error('❌ Failed to initialize email service:', error.message);
     }
@@ -53,7 +76,7 @@ class EmailService {
 
   async sendOTP(email, otp) {
     // Always log to console for development
-    console.log(`📧 OTP for ${email}: ${otp}`);
+    console.log(`📧 Attempting to send OTP to ${email}: ${otp}`);
 
     // If no transporter configured, only log to console
     if (!this.transporter) {
@@ -61,7 +84,19 @@ class EmailService {
       return { success: true, method: 'console' };
     }
 
+    // Test connection before sending
     try {
+      console.log('🔍 Testing email connection before sending...');
+      await this.transporter.verify();
+      console.log('✅ Email connection verified successfully');
+    } catch (verifyError) {
+      console.error('❌ Email connection verification failed:', verifyError.message);
+      console.log('📝 Falling back to console logging only.');
+      return { success: true, method: 'console', error: verifyError.message };
+    }
+
+    try {
+      console.log('📤 Preparing email with options:');
       const mailOptions = {
         from: {
           name: 'OTP Authentication App',
@@ -96,14 +131,22 @@ class EmailService {
           </div>
         `
       };
+      
+      console.log('📧 Sending email from:', mailOptions.from.address);
+      console.log('📧 Sending email to:', mailOptions.to);
+      console.log('📧 Email subject:', mailOptions.subject);
 
       const result = await this.transporter.sendMail(mailOptions);
       console.log('✅ Email sent successfully to:', email);
       console.log('📧 Message ID:', result.messageId);
+      console.log('📧 Response:', result.response);
       return { success: true, method: 'email', messageId: result.messageId };
     } catch (error) {
       console.error('❌ Failed to send email to:', email);
-      console.error('❌ Error details:', error.message);
+      console.error('❌ Error type:', error.name);
+      console.error('❌ Error code:', error.code);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Full error:', error);
       console.log('📝 Falling back to console logging only.');
       return { success: true, method: 'console', error: error.message };
     }

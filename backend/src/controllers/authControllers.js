@@ -215,5 +215,37 @@ exports.testEmail = async (req, res) => {
   }
 };
 
+// Test sending actual email
+exports.testSendEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+    
+    console.log(`🧪 Testing email send to: ${email}`);
+    
+    // Generate test OTP
+    const testOtp = '123456';
+    
+    // Send test email
+    const result = await emailService.sendOTP(email, testOtp);
+    
+    res.status(200).json({
+      message: 'Test email send completed',
+      email,
+      testOtp,
+      result
+    });
+  } catch (error) {
+    console.error('❌ Test email send failed:', error);
+    res.status(500).json({
+      message: 'Test email send failed',
+      error: error.message
+    });
+  }
+};
+
 // Keep the old verifyOtp for backward compatibility
 exports.verifyOtp = exports.verifyOtpController;
