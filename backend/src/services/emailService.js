@@ -31,12 +31,18 @@ class EmailService {
         throw new Error('SENDGRID_API_KEY environment variable not found');
       }
       
-      // Remove any potential whitespace or quotes
-      const apiKey = process.env.SENDGRID_API_KEY.trim().replace(/["']/g, '');
+      // Remove any potential whitespace, quotes, or special characters
+      const apiKey = process.env.SENDGRID_API_KEY.trim().replace(/["'\n\r\t]/g, '');
       
-      console.log('🔑 API key length:', apiKey.length);
-      console.log('🔑 API key starts with:', apiKey.substring(0, 3) + '...');
+      console.log('🔑 Raw API key length:', process.env.SENDGRID_API_KEY.length);
+      console.log('🔑 Cleaned API key length:', apiKey.length);
+      console.log('🔑 API key preview:', apiKey.substring(0, 8) + '...');
       
+      if (apiKey.length === 0) {
+        throw new Error('SendGrid API key is empty after cleanup');
+      }
+      
+      // Set the cleaned API key
       sgMail.setApiKey(apiKey);
       this.sendgridConfigured = true;
       
@@ -56,23 +62,33 @@ class EmailService {
   async testSendGridConnection() {
     try {
       console.log('🔍 Testing SendGrid API key...');
+      console.log('🔑 SENDGRID_API_KEY exists:', !!process.env.SENDGRID_API_KEY);
       
-      // Check if API key exists and has reasonable length
+      // Check if API key exists
       if (!process.env.SENDGRID_API_KEY) {
-        throw new Error('SendGrid API key not provided');
+        throw new Error('SendGrid API key not provided in environment variables');
       }
       
-      if (process.env.SENDGRID_API_KEY.length < 20) {
-        throw new Error('SendGrid API key appears to be too short');
+      // Clean and validate API key
+      const apiKey = process.env.SENDGRID_API_KEY.trim();
+      console.log('🔑 API key length after trim:', apiKey.length);
+      console.log('🔑 API key first 10 chars:', apiKey.substring(0, 10));
+      
+      if (apiKey.length < 10) {
+        throw new Error(`SendGrid API key is too short (${apiKey.length} characters). Expected at least 10 characters.`);
       }
       
-      // Test with a simple API call instead of format checking
-      console.log('✅ SendGrid API key format appears valid');
+      // Check for common issues
+      if (apiKey.includes('your_') || apiKey.includes('example') || apiKey.includes('placeholder')) {
+        throw new Error('SendGrid API key appears to be a placeholder. Please set a real API key.');
+      }
+      
+      console.log('✅ SendGrid API key validation passed');
       console.log('📧 SendGrid is ready for email delivery');
-      return { success: true, method: 'sendgrid' };
+      return { success: true, method: 'sendgrid', keyLength: apiKey.length };
       
     } catch (error) {
-      console.error('❌ SendGrid test failed:', error.message);
+      console.error('❌ SendGrid validation failed:', error.message);
       return { success: false, method: 'sendgrid', error: error.message };
     }
   }
