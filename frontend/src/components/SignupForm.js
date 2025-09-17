@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import api from '../api';
 
 const SignupForm = () => {
   const [formData, setFormData] = useState({
@@ -31,27 +32,12 @@ const SignupForm = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password
-        })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Redirect to OTP verification page with email
-        navigate('/verify-otp', { state: { email: formData.email } });
-      } else {
-        setMessage(data.message || 'Signup failed');
-      }
+      const data = await api.signup(formData.email, formData.password);
+      
+      // Redirect to OTP verification page with email
+      navigate('/verify-otp', { state: { email: formData.email } });
     } catch (error) {
-      setMessage('Something went wrong. Please try again.');
+      setMessage(error.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,7 @@
 import React, { useState, useContext } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import api from '../api';
 
 const OtpForm = () => {
   const [otp, setOtp] = useState("");
@@ -27,22 +28,12 @@ const OtpForm = () => {
     setMessage("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        login({ email, token: data.token }); // save user in context
-        navigate("/dashboard");
-      } else {
-        setMessage(data.message || "OTP verification failed");
-      }
+      const data = await api.verifyOtp(email, otp);
+      
+      login({ email, token: data.token }); // save user in context
+      navigate("/dashboard");
     } catch (err) {
-      setMessage("Something went wrong. Try again.");
+      setMessage(err.message || "OTP verification failed");
     } finally {
       setLoading(false);
     }
@@ -53,21 +44,11 @@ const OtpForm = () => {
     setMessage("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/resend-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setMessage("New OTP sent to your email!");
-      } else {
-        setMessage(data.message || "Failed to resend OTP");
-      }
+      const data = await api.resendOtp(email);
+      
+      setMessage("New OTP sent to your email!");
     } catch (err) {
-      setMessage("Something went wrong. Try again.");
+      setMessage(err.message || "Failed to resend OTP");
     } finally {
       setResendLoading(false);
     }
