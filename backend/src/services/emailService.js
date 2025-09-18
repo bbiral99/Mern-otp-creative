@@ -322,37 +322,58 @@ class EmailService {
         // Attempt connection with timeout
         const verifyPromise = this.transporter.verify();
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Connection timeout after 15 seconds')), 15000)
+          setTimeout(() => reject(new Error('Connection timeout after 30 seconds')), 30000)
         );
         
         await Promise.race([verifyPromise, timeoutPromise]);
         console.log('✅ Gmail SMTP connection verified!');
-        return { success: true, method: 'gmail-smtp', details: 'Connection successful' };
+        return { 
+          success: true, 
+          method: 'gmail-smtp', 
+          details: 'Connection successful',
+          smtp: {
+            host: 'smtp.gmail.com',
+            port: 587,
+            user: process.env.EMAIL_USER,
+            secure: false
+          }
+        };
       } catch (error) {
         console.error('❌ Gmail SMTP test failed:', error.message);
         console.error('❌ Error code:', error.code);
         console.error('❌ Error response:', error.response);
         
+        let errorDetails = {
+          code: error.code,
+          message: error.message,
+          response: error.response
+        };
+        
         if (error.code === 'EAUTH') {
-          console.error('🚨 AUTHENTICATION FAILED - Check EMAIL_PASS in Vercel environment');
+          errorDetails.fix = 'Check EMAIL_PASS in Vercel environment - ensure it is a valid Gmail App Password';
         } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNRESET') {
-          console.error('🚨 CONNECTION TIMEOUT - Vercel network issue or Gmail blocking');
+          errorDetails.fix = 'Vercel may be blocking SMTP ports - try configuring Vercel project settings';
         }
+        
+        // Instead of silently falling back to SendGrid, throw the Gmail error
+        throw new Error(JSON.stringify({
+          error: 'Gmail SMTP connection failed',
+          details: errorDetails,
+          smtp: {
+            host: 'smtp.gmail.com',
+            port: 587,
+            user: process.env.EMAIL_USER,
+            secure: false
+          }
+        }));
       }
     } else {
       console.log('❌ Gmail SMTP transporter not initialized');
       if (!process.env.EMAIL_PASS) {
-        console.log('🚨 CRITICAL: EMAIL_PASS missing from Vercel environment variables!');
+        throw new Error('Gmail SMTP not initialized - EMAIL_PASS missing from environment variables');
       }
+      throw new Error('Gmail SMTP transporter failed to initialize');
     }
-    
-    // Test SendGrid fallback
-    if (this.sendgridConfigured) {
-      console.log('✅ SendGrid available as fallback');
-      return { success: true, method: 'sendgrid-fallback', details: 'Gmail failed, using SendGrid' };
-    }
-    
-    throw new Error('No email service available - Gmail SMTP failed and no SendGrid configured');
   }
 
 }
