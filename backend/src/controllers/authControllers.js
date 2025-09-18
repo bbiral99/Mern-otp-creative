@@ -1,11 +1,10 @@
 // src/controllers/authController.js
 const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const { validationResult } = require('express-validator');
 const emailService = require('../services/emailService');
-
-// In-memory storage for demo (use Redis or database in production)
-const otpStorage = new Map();
-const userStorage = new Map();
+const User = require('../models/User');
+const connectDB = require('../config/db');
 
 // Generate 6-digit OTP
 const generateOTP = () => {
@@ -20,6 +19,9 @@ const sendOTP = async (email, otp) => {
 
 exports.signup = async (req, res) => {
   try {
+    // Ensure database connection
+    await connectDB();
+
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -37,7 +39,8 @@ exports.signup = async (req, res) => {
     }
     
     // Check if user already exists
-    if (userStorage.has(email)) {
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
     
@@ -45,15 +48,19 @@ exports.signup = async (req, res) => {
     const otp = generateOTP();
     const otpExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
     
-    console.log(`📧 Generated OTP for ${email}: ${otp}`);
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
     
-    // Store user data temporarily (pending verification)
-    otpStorage.set(email, {
+    // Create user in database (unverified)
+    const user = new User({
+      email,
+      password: hashedPassword,
       otp,
       otpExpiry,
-      password, // In production, hash this password
-      verified: false
+      isVerified: false
     });
+    
+    await user.save();
     
     // Send OTP
     const emailResult = await sendOTP(email, otp);
@@ -70,33 +77,33 @@ exports.signup = async (req, res) => {
     res.status(200).json(response);
   } catch (error) {
     console.error('Signup error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
 
-exports.verifyOtpController = (req, res) => {
+exports.verifyOtpController = async (req, res) => {
   try {
+    await connectDB();
     const { email, otp } = req.body;
     
     if (!email || !otp) {
       return res.status(400).json({ message: 'Email and OTP are required' });
     }
     
-    // Get stored OTP data
-    const storedData = otpStorage.get(email);
+    // Get user from database
+    const user = await User.findOne({ email });
     
-    if (!storedData) {
-      return res.status(400).json({ message: 'OTP not found. Please request a new one.' });
+    if (!user) {
+      return res.status(400).json({ message: 'User not found. Please sign up.' });
     }
     
     // Check if OTP expired
-    if (Date.now() > storedData.otpExpiry) {
-      otpStorage.delete(email);
+    if (Date.now() > user.otpExpiry) {
       return res.status(400).json({ message: 'OTP expired. Please request a new one.' });
     }
     
     // Verify OTP
-    if (storedData.otp !== otp) {
+    if (user.otp !== otp) {
       return res.status(400).json({ message: 'Invalid OTP' });
     }
     
@@ -125,22 +132,31 @@ exports.verifyOtpController = (req, res) => {
   }
 };
 
-exports.login = (req, res) => {
+exports.login = async (req, res) => {
   try {
+    await connectDB();
     const { email, password } = req.body;
     
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
     
-    // Check if user exists
-    const user = userStorage.get(email);
+    // Find user in database
+    const user = await User.findOne({ email });
     
     if (!user) {
-      return res.status(400).json({ message: 'User not found. Please sign up first.' });
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
     
-    // Verify password (use bcrypt in production)
+    if (!user.isVerified) {
+      return res.status(401).json({ message: 'Please verify your email first' });
+    }
+    
+    // Verify password
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
     if (user.password !== password) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
