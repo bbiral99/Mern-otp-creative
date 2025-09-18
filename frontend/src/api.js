@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://mern-otp-creative-recn.vercel.app/api';
 
 class ApiClient {
   async request(endpoint, options = {}) {
@@ -8,6 +8,8 @@ class ApiClient {
         'Content-Type': 'application/json',
         ...options.headers,
       },
+      credentials: 'include',  // Include credentials for CORS
+      mode: 'cors',           // Explicitly set CORS mode
       ...options,
     };
 

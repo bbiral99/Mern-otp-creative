@@ -38,16 +38,17 @@ console.log('🌍 CORS allowed origins:', allowedOrigins);
 console.log('🌍 CLIENT_URL env var:', process.env.CLIENT_URL);
 
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-    
-    // Check if origin is in allowed list
-    if (allowedOrigins.some(allowed => 
-      origin === allowed || 
-      origin.endsWith('.vercel.app') ||
-      origin.includes('localhost')
-    )) {
+  origin: true, // Allow all origins during development
+  credentials: true, // Allow credentials
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With',
+    'Content-Type',
+    'Accept',
+    'Authorization',
+    'Access-Control-Allow-Origin'
+  ],
       return callback(null, true);
     }
     
