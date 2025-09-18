@@ -11,9 +11,15 @@ class ApiClient {
       ...options,
     };
 
+    console.log('🔧 API Request:', { url, config });
+
     try {
       const response = await fetch(url, config);
+      console.log('🔧 API Response Status:', response.status);
+      console.log('🔧 API Response Headers:', response.headers);
+      
       const data = await response.json();
+      console.log('🔧 API Response Data:', data);
       
       if (!response.ok) {
         throw new Error(data.message || 'Request failed');
@@ -21,7 +27,8 @@ class ApiClient {
       
       return data;
     } catch (error) {
-      console.error('API request failed:', error);
+      console.error('❌ API request failed:', error);
+      console.error('❌ Error details:', { endpoint, url, error: error.message });
       throw error;
     }
   }

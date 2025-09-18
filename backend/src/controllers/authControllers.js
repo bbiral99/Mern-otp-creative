@@ -1,5 +1,6 @@
 // src/controllers/authController.js
 const crypto = require('crypto');
+const { validationResult } = require('express-validator');
 const emailService = require('../services/emailService');
 
 // In-memory storage for demo (use Redis or database in production)
@@ -19,6 +20,15 @@ const sendOTP = async (email, otp) => {
 
 exports.signup = async (req, res) => {
   try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        message: 'Validation failed', 
+        errors: errors.array()
+      });
+    }
+    
     const { email, password } = req.body;
     
     // Validate input
@@ -35,6 +45,8 @@ exports.signup = async (req, res) => {
     const otp = generateOTP();
     const otpExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
     
+    console.log(`📧 Generated OTP for ${email}: ${otp}`);
+    
     // Store user data temporarily (pending verification)
     otpStorage.set(email, {
       otp,
@@ -46,11 +58,16 @@ exports.signup = async (req, res) => {
     // Send OTP
     const emailResult = await sendOTP(email, otp);
     
-    res.status(200).json({ 
+    console.log(`📧 Email result:`, emailResult);
+    
+    const response = {
       message: 'OTP sent to your email. Please verify to complete registration.',
       email,
-      emailSent: emailResult.method === 'email'
-    });
+      emailSent: emailResult.success || emailResult.method === 'email'
+    };
+    
+    console.log('📨 Sending response to frontend:', response);
+    res.status(200).json(response);
   } catch (error) {
     console.error('Signup error:', error);
     res.status(500).json({ message: 'Internal server error' });

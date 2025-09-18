@@ -20,7 +20,7 @@
     "express-validator": "^7.0.1",
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^7.3.1",
-    "nodemailer": "^6.10.1"
+    "nodemailer": "^7.0.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.13",

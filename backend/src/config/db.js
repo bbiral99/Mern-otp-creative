@@ -1,14 +1,27 @@
-// Basic database connection placeholder
-// Replace this with your actual database connection (MongoDB, PostgreSQL, etc.)
+const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    // For now, this is a placeholder - no actual database connection
-    console.log('Database connection placeholder - ready to add your database!');
-    return Promise.resolve();
+    // Check if already connected
+    if (mongoose.connections[0].readyState) {
+      console.log('MongoDB already connected');
+      return;
+    }
+
+    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/otpmernproject';
+    
+    await mongoose.connect(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    
+    console.log('MongoDB connected successfully');
   } catch (error) {
     console.error('Database connection error:', error);
-    throw error;
+    // Don't throw error in production to prevent function from failing
+    if (process.env.NODE_ENV !== 'production') {
+      throw error;
+    }
   }
 };
 

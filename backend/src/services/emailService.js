@@ -9,116 +9,91 @@ class EmailService {
   }
 
   initializeEmailService() {
-    console.log('📧 Initializing Email Service...');
+    console.log('📧 Initializing Email Service for Vercel...');
     console.log('📧 EMAIL_USER:', process.env.EMAIL_USER);
-    console.log('📧 EMAIL_SERVICE:', process.env.EMAIL_SERVICE);
+    console.log('📧 EMAIL_PASS configured:', !!process.env.EMAIL_PASS);
     console.log('📧 SENDGRID_API_KEY configured:', !!process.env.SENDGRID_API_KEY);
     
-    // Try SendGrid first (recommended for production)
+    // Priority 1: Try Gmail SMTP first (as requested)
+    this.initializeGmailSMTP();
+    
+    // Priority 2: Initialize SendGrid as fallback
     if (process.env.SENDGRID_API_KEY) {
       this.initializeSendGrid();
     } else {
-      console.log('⚠️  No SendGrid API key found, trying SMTP fallback...');
-      this.initializeSMTP();
+      console.log('⚠️  No SendGrid API key found - SMTP only mode');
     }
   }
 
-  initializeSendGrid() {
-    try {
-      console.log('📧 Configuring SendGrid...');
-      
-      if (!process.env.SENDGRID_API_KEY) {
-        throw new Error('SENDGRID_API_KEY environment variable not found');
-      }
-      
-      // Remove any potential whitespace, quotes, or special characters
-      const apiKey = process.env.SENDGRID_API_KEY.trim().replace(/["'\n\r\t]/g, '');
-      
-      console.log('🔑 Raw API key length:', process.env.SENDGRID_API_KEY.length);
-      console.log('🔑 Cleaned API key length:', apiKey.length);
-      console.log('🔑 API key preview:', apiKey.substring(0, 8) + '...');
-      
-      if (apiKey.length === 0) {
-        throw new Error('SendGrid API key is empty after cleanup');
-      }
-      
-      // Set the cleaned API key
-      sgMail.setApiKey(apiKey);
-      this.sendgridConfigured = true;
-      
-      console.log('✅ SendGrid configured successfully');
-      console.log('📧 Using SendGrid for email delivery');
-      
-      // Test SendGrid connection
-      this.testSendGridConnection();
-    } catch (error) {
-      console.error('❌ Failed to configure SendGrid:', error.message);
-      console.log('🔄 Falling back to SMTP...');
-      this.sendgridConfigured = false;
-      this.initializeSMTP();
-    }
-  }
-
-  async testSendGridConnection() {
-    try {
-      console.log('🔍 Testing SendGrid API key...');
-      console.log('🔑 SENDGRID_API_KEY exists:', !!process.env.SENDGRID_API_KEY);
-      
-      // Check if API key exists
-      if (!process.env.SENDGRID_API_KEY) {
-        throw new Error('SendGrid API key not provided in environment variables');
-      }
-      
-      // Clean and validate API key
-      const apiKey = process.env.SENDGRID_API_KEY.trim();
-      console.log('🔑 API key length after trim:', apiKey.length);
-      console.log('🔑 API key first 10 chars:', apiKey.substring(0, 10));
-      
-      if (apiKey.length < 10) {
-        throw new Error(`SendGrid API key is too short (${apiKey.length} characters). Expected at least 10 characters.`);
-      }
-      
-      // Check for common issues
-      if (apiKey.includes('your_') || apiKey.includes('example') || apiKey.includes('placeholder')) {
-        throw new Error('SendGrid API key appears to be a placeholder. Please set a real API key.');
-      }
-      
-      console.log('✅ SendGrid API key validation passed');
-      console.log('📧 SendGrid is ready for email delivery');
-      return { success: true, method: 'sendgrid', keyLength: apiKey.length };
-      
-    } catch (error) {
-      console.error('❌ SendGrid validation failed:', error.message);
-      return { success: false, method: 'sendgrid', error: error.message };
-    }
-  }
-
-  initializeSMTP() {
+  initializeGmailSMTP() {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.log('⚠️  No email credentials configured. Emails will be logged to console only.');
+      console.log('⚠️  No Gmail credentials - SMTP unavailable');
       return;
     }
 
     try {
+      console.log('📧 Configuring Gmail SMTP for Vercel...');
+      console.log('📧 SMTP Host: smtp.gmail.com');
+      console.log('📧 SMTP Port: 587');
+      console.log('📧 SMTP User:', process.env.EMAIL_USER);
+
+      // Vercel-optimized Gmail SMTP configuration
       const transportConfig = {
         host: 'smtp.gmail.com',
         port: 587,
-        secure: false,
+        secure: false, // Use STARTTLS
         requireTLS: true,
         auth: {
           user: process.env.EMAIL_USER,
           pass: process.env.EMAIL_PASS
         },
-        connectionTimeout: 10000,
-        greetingTimeout: 5000,
-        socketTimeout: 10000
+        // Vercel serverless optimizations
+        connectionTimeout: 30000, // 30 seconds for Vercel cold starts
+        greetingTimeout: 15000,    // 15 seconds for server greeting
+        socketTimeout: 30000,      // 30 seconds for socket operations
+        pool: false,               // Disable pooling for serverless
+        maxConnections: 1,         // Single connection for serverless
+        // Additional Vercel compatibility
+        tls: {
+          ciphers: 'SSLv3',
+          rejectUnauthorized: true
+        },
+        debug: process.env.NODE_ENV === 'development'
       };
 
       this.transporter = nodemailer.createTransport(transportConfig);
-      console.log('✅ SMTP transporter configured (fallback)');
+      console.log('✅ Gmail SMTP configured for Vercel');
       
     } catch (error) {
-      console.error('❌ Failed to configure SMTP:', error.message);
+      console.error('❌ Failed to configure Gmail SMTP:', error.message);
+      this.transporter = null;
+    }
+  }
+
+  initializeSendGrid() {
+    try {
+      console.log('📧 Configuring SendGrid (fallback)...');
+      
+      if (!process.env.SENDGRID_API_KEY) {
+        console.log('⚠️  No SendGrid API key - SMTP primary mode');
+        return;
+      }
+      
+      const apiKey = process.env.SENDGRID_API_KEY.trim().replace(/["'\n\r\t]/g, '');
+      
+      if (apiKey.length < 32) {
+        console.log('⚠️  SendGrid API key invalid - using SMTP only');
+        return;
+      }
+      
+      sgMail.setApiKey(apiKey);
+      this.sendgridConfigured = true;
+      
+      console.log('✅ SendGrid configured as fallback');
+      
+    } catch (error) {
+      console.error('❌ SendGrid fallback failed:', error.message);
+      this.sendgridConfigured = false;
     }
   }
 
@@ -126,20 +101,118 @@ class EmailService {
     console.log(`📧 Sending OTP to: ${email}`);
     console.log(`🔑 OTP Code: ${otp}`);
 
-    // Try SendGrid first
+    // Priority 1: Try Gmail SMTP first (as requested by user)
+    if (this.transporter) {
+      console.log('📧 Attempting Gmail SMTP first...');
+      const smtpResult = await this.sendViaGmailSMTP(email, otp);
+      if (smtpResult.success) {
+        return smtpResult;
+      }
+      console.log('⚠️  Gmail SMTP failed, trying SendGrid fallback...');
+    }
+    
+    // Priority 2: Fallback to SendGrid
     if (this.sendgridConfigured) {
       return await this.sendViaSendGrid(email, otp);
     }
-    
-    // Fallback to SMTP
-    if (this.transporter) {
-      return await this.sendViaSMTP(email, otp);
+
+    // Last resort - throw error
+    throw new Error('No email service available. Configure Gmail SMTP or SendGrid.');
+  }
+
+  async sendViaGmailSMTP(email, otp) {
+    if (!this.transporter) {
+      return {
+        success: false,
+        method: 'smtp-not-configured',
+        error: 'Gmail SMTP not configured'
+      };
     }
 
-    // Last resort - console logging
-    console.log('❌ No email service available - logging to console');
-    console.log(`📧 OTP for ${email}: ${otp}`);
-    return { success: true, method: 'console', email, otp };
+    try {
+      console.log('🔍 Verifying Gmail SMTP connection...');
+      await this.transporter.verify();
+      console.log('✅ Gmail SMTP connection verified');
+      
+      const mailOptions = {
+        from: {
+          name: 'OTP Authentication',
+          address: process.env.EMAIL_USER
+        },
+        to: email,
+        subject: 'Your OTP Verification Code',
+        html: `
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa;">
+            <div style="background: linear-gradient(135deg, #4285f4 0%, #34a853 100%); padding: 40px 30px; border-radius: 12px 12px 0 0; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+              <h1 style="color: white; margin: 0; font-size: 32px; font-weight: 600;">🔐 Verification Code</h1>
+              <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Delivered via Gmail SMTP on Vercel</p>
+            </div>
+            
+            <div style="background: white; padding: 50px 40px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+              <h2 style="color: #333; text-align: center; margin: 0 0 30px 0; font-size: 24px; font-weight: 500;">Your Security Code</h2>
+              
+              <div style="background: linear-gradient(135deg, #e8f0fe 0%, #f3e5f5 100%); padding: 30px; border-radius: 12px; text-align: center; margin: 40px 0; border: 2px solid #4285f4; position: relative;">
+                <div style="font-size: 48px; letter-spacing: 16px; margin: 0; color: #4285f4; font-weight: bold; font-family: 'Courier New', monospace; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">${otp}</div>
+              </div>
+              
+              <div style="text-align: center; margin: 40px 0;">
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                  <p style="color: #856404; margin: 0; font-size: 16px; font-weight: 500;">
+                    ⏰ <strong>Expires in 5 minutes</strong>
+                  </p>
+                </div>
+                
+                <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                  <p style="color: #721c24; margin: 0; font-size: 14px;">
+                    🔒 <strong>Security Notice:</strong> Never share this code with anyone
+                  </p>
+                </div>
+              </div>
+              
+              <div style="background: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 30px 0; border-radius: 0 8px 8px 0;">
+                <p style="color: #155724; margin: 0; font-size: 14px; font-weight: 500;">
+                  ✨ Sent securely via Gmail SMTP on Vercel
+                </p>
+              </div>
+              
+              <div style="text-align: center; margin-top: 50px; padding-top: 30px; border-top: 1px solid #e9ecef;">
+                <p style="color: #6c757d; font-size: 12px; margin: 0; line-height: 1.5;">
+                  If you didn't request this verification code, please ignore this email.<br>
+                  This is an automated message, please do not reply.
+                </p>
+              </div>
+            </div>
+          </div>
+        `
+      };
+      
+      console.log('📧 Sending via Gmail SMTP (Vercel)...');
+      console.log('📧 From:', process.env.EMAIL_USER);
+      console.log('📧 To:', email);
+      
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Email sent successfully via Gmail SMTP!');
+      console.log('📧 Message ID:', result.messageId);
+      
+      return {
+        success: true,
+        method: 'gmail-smtp',
+        messageId: result.messageId,
+        email,
+        timestamp: new Date().toISOString(),
+        platform: 'vercel'
+      };
+    } catch (error) {
+      console.error('❌ Gmail SMTP failed:', error.message);
+      console.error('❌ SMTP error details:', error);
+      return {
+        success: false,
+        method: 'gmail-smtp-failed',
+        error: error.message,
+        email,
+        otp
+      };
+    }
   }
 
   async sendViaSendGrid(email, otp) {
@@ -152,35 +225,30 @@ class EmailService {
         },
         subject: 'Your OTP Verification Code',
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-              <h1 style="color: white; margin: 0; font-size: 28px;">🔐 Verification Code</h1>
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; border-radius: 12px 12px 0 0; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+              <h1 style="color: white; margin: 0; font-size: 32px; font-weight: 600;">🔐 Verification Code</h1>
+              <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">SendGrid Fallback Service</p>
             </div>
-            <div style="background: #f8f9fa; padding: 40px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
-              <h2 style="color: #333; text-align: center; margin-bottom: 30px;">Your Security Code</h2>
+            
+            <div style="background: white; padding: 50px 40px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+              <h2 style="color: #333; text-align: center; margin: 0 0 30px 0; font-size: 24px; font-weight: 500;">Your Security Code</h2>
               
-              <div style="background: white; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0; border: 3px solid #667eea; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                <div style="font-size: 42px; letter-spacing: 12px; margin: 0; color: #667eea; font-weight: bold; font-family: 'Courier New', monospace;">${otp}</div>
+              <div style="background: linear-gradient(135deg, #f8f9ff 0%, #e8f0ff 100%); padding: 30px; border-radius: 12px; text-align: center; margin: 40px 0; border: 2px solid #667eea;">
+                <div style="font-size: 48px; letter-spacing: 16px; margin: 0; color: #667eea; font-weight: bold; font-family: 'Courier New', monospace;">${otp}</div>
               </div>
               
-              <div style="text-align: center; margin: 30px 0;">
-                <p style="color: #666; font-size: 16px; margin-bottom: 20px;">
-                  ⏰ <strong>This code expires in 5 minutes</strong>
-                </p>
-                <p style="color: #888; font-size: 14px;">
-                  🔒 Never share this code with anyone for your security
-                </p>
+              <div style="text-align: center; margin: 40px 0;">
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                  <p style="color: #856404; margin: 0; font-size: 16px; font-weight: 500;">
+                    ⏰ <strong>Expires in 5 minutes</strong>
+                  </p>
+                </div>
               </div>
               
-              <div style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0; border-radius: 4px;">
-                <p style="color: #1976d2; margin: 0; font-size: 14px;">
-                  ✉️ Delivered securely via SendGrid
-                </p>
-              </div>
-              
-              <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">
-                <p style="color: #999; font-size: 12px; margin: 0;">
-                  If you didn't request this code, please ignore this email.
+              <div style="background: #d1ecf1; border-left: 4px solid #bee5eb; padding: 20px; margin: 30px 0; border-radius: 0 8px 8px 0;">
+                <p style="color: #0c5460; margin: 0; font-size: 14px; font-weight: 500;">
+                  ✨ Delivered via SendGrid (fallback)
                 </p>
               </div>
             </div>
@@ -188,7 +256,7 @@ class EmailService {
         `
       };
 
-      console.log('📧 Sending via SendGrid...');
+      console.log('📧 Sending via SendGrid (fallback)...');
       console.log('📧 From:', msg.from.email);
       console.log('📧 To:', email);
       
@@ -198,111 +266,43 @@ class EmailService {
       
       return {
         success: true,
-        method: 'sendgrid',
+        method: 'sendgrid-fallback',
         email,
         statusCode: response[0]?.statusCode,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        platform: 'vercel'
       };
     } catch (error) {
-      console.error('❌ SendGrid failed:', error.message);
+      console.error('❌ SendGrid fallback failed:', error.message);
       console.error('❌ SendGrid error code:', error.code);
-      console.error('❌ SendGrid error details:', error.response?.body);
       
-      // Check for specific SendGrid errors
-      if (error.code === 401) {
-        console.error('❌ SendGrid authentication failed - check your API key');
-      } else if (error.code === 403) {
-        console.error('❌ SendGrid forbidden - check sender verification');
-      }
-      
-      console.log('🔄 Trying SMTP fallback...');
-      
-      // Try SMTP fallback
-      if (this.transporter) {
-        return await this.sendViaSMTP(email, otp);
-      }
-      
-      return {
-        success: false,
-        method: 'sendgrid-failed',
-        error: error.message,
-        code: error.code,
-        email,
-        otp
-      };
-    }
-  }
-
-  async sendViaSMTP(email, otp) {
-    try {
-      const mailOptions = {
-        from: {
-          name: 'OTP Authentication',
-          address: process.env.EMAIL_USER
-        },
-        to: email,
-        subject: 'Your OTP Verification Code',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-              <h1 style="color: white; margin: 0; font-size: 28px;">🔐 Verification Code</h1>
-            </div>
-            <div style="background: #f8f9fa; padding: 40px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
-              <div style="background: white; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0; border: 3px solid #667eea;">
-                <div style="font-size: 42px; letter-spacing: 12px; margin: 0; color: #667eea; font-weight: bold;">${otp}</div>
-              </div>
-              <p style="text-align: center; color: #666;">This code expires in <strong>5 minutes</strong></p>
-            </div>
-          </div>
-        `
-      };
-      
-      console.log('📧 Sending via SMTP...');
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Email sent successfully via SMTP!');
-      
-      return {
-        success: true,
-        method: 'smtp',
-        messageId: result.messageId,
-        email,
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('❌ SMTP failed:', error.message);
-      return {
-        success: false,
-        method: 'smtp-failed',
-        error: error.message,
-        email,
-        otp
-      };
+      throw new Error(`All email services failed. Last error: ${error.message}`);
     }
   }
 
   async testConnection() {
-    console.log('🔍 Testing email service connection...');
+    console.log('🔍 Testing email service connection for Vercel...');
     
-    if (this.sendgridConfigured) {
-      console.log('📧 Testing SendGrid configuration...');
-      return await this.testSendGridConnection();
-    }
-    
+    // Test Gmail SMTP first
     if (this.transporter) {
-      console.log('📧 Testing SMTP configuration...');
       try {
         await this.transporter.verify();
-        console.log('✅ SMTP connection verified!');
-        return { success: true, method: 'smtp' };
+        console.log('✅ Gmail SMTP connection verified!');
+        return { success: true, method: 'gmail-smtp' };
       } catch (error) {
-        console.error('❌ SMTP connection failed:', error.message);
-        return { success: false, method: 'smtp', error: error.message };
+        console.error('❌ Gmail SMTP test failed:', error.message);
       }
     }
     
-    console.log('⚠️  No email service configured');
-    return { success: false, method: 'none', message: 'No email service available' };
+    // Test SendGrid fallback
+    if (this.sendgridConfigured) {
+      console.log('✅ SendGrid available as fallback');
+      return { success: true, method: 'sendgrid-fallback' };
+    }
+    
+    throw new Error('No email service available');
   }
+
 }
 
 module.exports = new EmailService();
