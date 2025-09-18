@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const authController = require('../controllers/authControllers');
+const withDatabase = require('../middlewares/withDatabase');
 
 // Signup
 router.post(
@@ -10,7 +11,7 @@ router.post(
     body('email').isEmail().withMessage('Valid email required'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
   ],
-  authController.signup
+  withDatabase(authController.signup)
 );
 
 // Resend OTP
@@ -20,7 +21,7 @@ router.post('/resend-otp', authController.resendOtp);
 router.post('/verify-otp', authController.verifyOtpController);
 
 // Login
-router.post('/login', authController.login);
+router.post('/login', withDatabase(authController.login));
 
 // Logout
 router.post('/logout', authController.logout);
