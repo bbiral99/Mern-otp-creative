@@ -208,8 +208,10 @@ exports.testEmail = async (req, res) => {
     console.log('🧪 Testing email configuration...');
     console.log('📧 Email service:', process.env.EMAIL_SERVICE);
     console.log('📧 Email user:', process.env.EMAIL_USER);
-    console.log('📧 SMTP host:', process.env.EMAIL_HOST);
-    console.log('📧 SMTP port:', process.env.EMAIL_PORT);
+    console.log('📧 EMAIL_PASS configured:', !!process.env.EMAIL_PASS);
+    console.log('📧 EMAIL_PASS length:', process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0);
+    console.log('📧 SENDGRID_API_KEY configured:', !!process.env.SENDGRID_API_KEY);
+    console.log('📧 SENDGRID_API_KEY length:', process.env.SENDGRID_API_KEY ? process.env.SENDGRID_API_KEY.length : 0);
     
     const result = await emailService.testConnection();
     
@@ -218,8 +220,10 @@ exports.testEmail = async (req, res) => {
       configuration: {
         service: process.env.EMAIL_SERVICE,
         user: process.env.EMAIL_USER,
-        host: process.env.EMAIL_HOST,
-        port: process.env.EMAIL_PORT
+        emailPassConfigured: !!process.env.EMAIL_PASS,
+        emailPassLength: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0,
+        sendgridConfigured: !!process.env.SENDGRID_API_KEY,
+        sendgridKeyLength: process.env.SENDGRID_API_KEY ? process.env.SENDGRID_API_KEY.length : 0
       },
       ...result
     });
@@ -227,7 +231,13 @@ exports.testEmail = async (req, res) => {
     console.error('❌ Email test failed:', error);
     res.status(500).json({
       message: 'Email service test failed',
-      error: error.message
+      error: error.message,
+      configuration: {
+        service: process.env.EMAIL_SERVICE,
+        user: process.env.EMAIL_USER,
+        emailPassConfigured: !!process.env.EMAIL_PASS,
+        sendgridConfigured: !!process.env.SENDGRID_API_KEY
+      }
     });
   }
 };
