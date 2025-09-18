@@ -25,41 +25,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS configuration for both development and production
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'https://mern-otp-creative-it-frontend.vercel.app', // Your actual frontend URL
-  process.env.CLIENT_URL,
-  process.env.FRONTEND_URL
-].filter(Boolean); // Remove undefined values
-
-console.log('🌍 CORS allowed origins:', allowedOrigins);
-console.log('🌍 CLIENT_URL env var:', process.env.CLIENT_URL);
-
+// CORS configuration
 app.use(cors({
-  origin: true, // Allow all origins during development
-  credentials: true, // Allow credentials
+  origin: '*',  // Allow all origins
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Origin',
-    'X-Requested-With',
-    'Content-Type',
-    'Accept',
-    'Authorization',
-    'Access-Control-Allow-Origin'
-  ],
-      return callback(null, true);
-    }
-    
-    console.log('❌ CORS blocked origin:', origin);
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  preflightContinue: false,
-  optionsSuccessStatus: 200
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Handle preflight requests
