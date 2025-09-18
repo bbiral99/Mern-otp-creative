@@ -1,22 +1,4 @@
-const e// Signup
-router.post(
-  '/signup',
-  dbConnect,
-  [
-    body('email').isEmail().withMessage('Valid email required'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
-  ],
-  authController.signup
-);
-
-// Resend OTP
-router.post('/resend-otp', dbConnect, authController.resendOtp);
-
-// Verify OTP
-router.post('/verify-otp', dbConnect, authController.verifyOtpController);
-
-// Login
-router.post('/login', dbConnect, authController.login);express');
+const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const authController = require('../controllers/authControllers');

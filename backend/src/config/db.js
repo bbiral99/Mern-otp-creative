@@ -3,18 +3,26 @@ const mongoose = require('mongoose');
 let cachedConnection = null;
 
 const connectDB = async () => {
-  if (cachedConnection) {
-    console.log('Using cached database connection');
+  if (cachedConnection && mongoose.connection.readyState === 1) {
+    console.log('✅ Using cached database connection');
     return cachedConnection;
   }
 
   try {
     console.log('🔌 Initializing new MongoDB connection...');
     
-    // Clear any existing connections
-    await mongoose.disconnect();
+    // Clear any existing connections if not in ready state
+    if (mongoose.connection.readyState !== 0) {
+      console.log('💫 Cleaning up existing connection...');
+      await mongoose.disconnect();
+    }
 
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/otpmernproject';
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI environment variable is not set');
+    }
+
+    const mongoURI = process.env.MONGODB_URI;
+    console.log('🔑 MongoDB URI configured');
     
     // Configure mongoose for serverless environment
     mongoose.set('bufferCommands', false); // Disable mongoose buffering
@@ -22,11 +30,13 @@ const connectDB = async () => {
     const options = {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000, // Timeout after 5 seconds
+      serverSelectionTimeoutMS: 10000, // Increased timeout to 10 seconds
       socketTimeoutMS: 45000, // Close sockets after 45 seconds
       family: 4, // Use IPv4, skip trying IPv6
       maxPoolSize: 10, // Maintain up to 10 socket connections
       minPoolSize: 1,  // Keep at least 1 socket connection
+      retryWrites: true,
+      w: 'majority',
     };
 
     // Connect to MongoDB
