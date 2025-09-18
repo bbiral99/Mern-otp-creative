@@ -1,4 +1,5 @@
 const express = require('express');
+const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/authRoutes');
@@ -22,6 +23,21 @@ app.use((req, res, next) => {
   if (req.body && Object.keys(req.body).length > 0) {
     console.log('📦 Body keys:', Object.keys(req.body));
   }
+  
+  // Debug environment variables in Vercel
+  if (req.url === '/debug-env' && req.method === 'GET') {
+    return res.json({
+      MONGODB_URI: !!process.env.MONGODB_URI,
+      EMAIL_USER: !!process.env.EMAIL_USER,
+      EMAIL_PASS: !!process.env.EMAIL_PASS,
+      NODE_ENV: process.env.NODE_ENV,
+      CLIENT_URL: process.env.CLIENT_URL,
+      allEnvKeys: Object.keys(process.env).filter(key => 
+        key.includes('MONGO') || key.includes('EMAIL') || key.includes('CLIENT')
+      )
+    });
+  }
+  
   next();
 });
 

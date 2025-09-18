@@ -1,4 +1,7 @@
 // Vercel serverless entry point
+// Load environment variables first
+require('dotenv').config();
+
 const app = require('../src/app');
 
 // Handle Vercel serverless function
