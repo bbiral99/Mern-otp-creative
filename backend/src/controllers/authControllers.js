@@ -4,7 +4,14 @@ const bcrypt = require('bcrypt');
 const { validationResult } = require('express-validator');
 const emailService = require('../services/emailService');
 const User = require('../models/User');
-const connectDB = require('../config/db');
+
+// Utility function to handle timeouts
+const withTimeout = async (operation) => {
+    const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database operation timed out')), 5000)
+    );
+    return Promise.race([operation(), timeout]);
+};
 
 // Generate 6-digit OTP
 const generateOTP = () => {
@@ -134,7 +141,6 @@ exports.verifyOtpController = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
-    await connectDB();
     const { email, password } = req.body;
     
     if (!email || !password) {
