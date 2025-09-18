@@ -30,13 +30,15 @@ const connectDB = async () => {
     const options = {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 10000, // Increased timeout to 10 seconds
+      serverSelectionTimeoutMS: 15000, // Increased timeout for Atlas
       socketTimeoutMS: 45000, // Close sockets after 45 seconds
       family: 4, // Use IPv4, skip trying IPv6
       maxPoolSize: 10, // Maintain up to 10 socket connections
       minPoolSize: 1,  // Keep at least 1 socket connection
       retryWrites: true,
       w: 'majority',
+      // MongoDB Atlas specific optimizations
+      connectTimeoutMS: 30000,
     };
 
     // Connect to MongoDB

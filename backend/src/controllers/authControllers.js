@@ -26,9 +26,6 @@ const sendOTP = async (email, otp) => {
 
 exports.signup = async (req, res) => {
   try {
-    // Ensure database connection
-    await connectDB();
-
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -69,6 +66,10 @@ exports.signup = async (req, res) => {
     
     await user.save();
     
+    console.log(`📊 User created in database: ${email}`);
+    console.log(`🔑 User ID: ${user._id}`);
+    console.log(`📫 OTP generated: ${otp}`);
+    
     // Send OTP
     const emailResult = await sendOTP(email, otp);
     
@@ -84,13 +85,22 @@ exports.signup = async (req, res) => {
     res.status(200).json(response);
   } catch (error) {
     console.error('Signup error:', error);
-    res.status(500).json({ message: 'Internal server error', error: error.message });
+    console.error('Error stack:', error.stack);
+    
+    // Handle specific MongoDB errors
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+    
+    res.status(500).json({ 
+      message: 'Internal server error', 
+      error: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
+    });
   }
 };
 
 exports.verifyOtpController = async (req, res) => {
   try {
-    await connectDB();
     const { email, otp } = req.body;
     
     if (!email || !otp) {
@@ -114,16 +124,14 @@ exports.verifyOtpController = async (req, res) => {
       return res.status(400).json({ message: 'Invalid OTP' });
     }
     
-    // OTP verified - create user account
-    userStorage.set(email, {
-      email,
-      password: storedData.password,
-      verified: true,
-      createdAt: new Date()
-    });
+    // OTP verified - mark user as verified
+    user.isVerified = true;
+    user.otp = undefined; // Remove OTP
+    user.otpExpiry = undefined; // Remove OTP expiry
+    await user.save();
     
-    // Remove OTP data
-    otpStorage.delete(email);
+    console.log(`✅ User verified successfully: ${email}`);
+    console.log(`📊 User saved to database with ID: ${user._id}`);
     
     // Generate simple token (use JWT in production)
     const token = crypto.randomBytes(32).toString('hex');
@@ -135,7 +143,11 @@ exports.verifyOtpController = async (req, res) => {
     });
   } catch (error) {
     console.error('OTP verification error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
+    });
   }
 };
 
@@ -163,9 +175,6 @@ exports.login = async (req, res) => {
     if (!validPassword) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-    if (user.password !== password) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
     
     // Generate simple token (use JWT in production)
     const token = crypto.randomBytes(32).toString('hex');
@@ -177,7 +186,11 @@ exports.login = async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
+    });
   }
 };
 
@@ -189,34 +202,40 @@ exports.resendOtp = async (req, res) => {
       return res.status(400).json({ message: 'Email is required' });
     }
     
-    // Check if there's pending OTP data
-    const storedData = otpStorage.get(email);
+    // Find user in database
+    const user = await User.findOne({ email });
     
-    if (!storedData) {
+    if (!user) {
       return res.status(400).json({ message: 'No pending verification found. Please sign up again.' });
+    }
+    
+    if (user.isVerified) {
+      return res.status(400).json({ message: 'User already verified. Please log in.' });
     }
     
     // Generate new OTP
     const otp = generateOTP();
     const otpExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
     
-    // Update stored data with new OTP
-    otpStorage.set(email, {
-      ...storedData,
-      otp,
-      otpExpiry
-    });
+    // Update user with new OTP
+    user.otp = otp;
+    user.otpExpiry = otpExpiry;
+    await user.save();
     
     // Send new OTP
     const emailResult = await sendOTP(email, otp);
     
     res.status(200).json({ 
       message: 'New OTP sent to your email',
-      emailSent: emailResult.method === 'email'
+      emailSent: emailResult.success || emailResult.method === 'email'
     });
   } catch (error) {
     console.error('Resend OTP error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
+    });
   }
 };
 

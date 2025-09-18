@@ -27,7 +27,12 @@ app.use((req, res, next) => {
 
 // CORS setup
 app.use(cors({
-  origin: ['http://localhost:3000', 'https://mern-otp-creative-recn.vercel.app'],
+  origin: [
+    'http://localhost:3000', 
+    'https://mern-otp-creative-recn.vercel.app',
+    'https://otp-mern-project-frontend.vercel.app',
+    process.env.CLIENT_URL
+  ].filter(Boolean),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: 'Content-Type, Authorization, X-Requested-With, Accept',
@@ -48,6 +53,40 @@ app.use('/api/auth', authRoutes);
 
 // Health check
 app.get('/health', (req, res) => res.json({ ok: true }));
+
+// Database health check
+app.get('/health/db', async (req, res) => {
+  try {
+    const connectDB = require('./config/db');
+    await connectDB();
+    
+    const mongoose = require('mongoose');
+    const dbState = mongoose.connection.readyState;
+    const states = {
+      0: 'disconnected',
+      1: 'connected',
+      2: 'connecting',
+      3: 'disconnecting'
+    };
+    
+    res.json({
+      ok: true,
+      database: {
+        status: states[dbState] || 'unknown',
+        readyState: dbState,
+        host: mongoose.connection.host,
+        name: mongoose.connection.name
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 // Version check
 app.get('/api/version', (req, res) => {

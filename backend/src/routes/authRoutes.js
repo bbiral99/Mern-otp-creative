@@ -16,10 +16,10 @@ router.post(
 );
 
 // Resend OTP
-router.post('/resend-otp', authController.resendOtp);
+router.post('/resend-otp', withDatabase(authController.resendOtp));
 
 // Verify OTP
-router.post('/verify-otp', authController.verifyOtpController);
+router.post('/verify-otp', withDatabase(authController.verifyOtpController));
 
 // Login
 router.post('/login', withDatabase(authController.login));

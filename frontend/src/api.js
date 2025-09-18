@@ -43,35 +43,35 @@ class ApiClient {
 
   // Auth endpoints
   signup(email, password) {
-    return this.request('/auth/signup', {
+    return this.request('/api/auth/signup', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
   }
 
   login(email, password) {
-    return this.request('/auth/login', {
+    return this.request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
   }
 
   verifyOtp(email, otp) {
-    return this.request('/auth/verify-otp', {
+    return this.request('/api/auth/verify-otp', {
       method: 'POST',
       body: JSON.stringify({ email, otp }),
     });
   }
 
   resendOtp(email) {
-    return this.request('/auth/resend-otp', {
+    return this.request('/api/auth/resend-otp', {
       method: 'POST',
       body: JSON.stringify({ email }),
     });
   }
 
   logout() {
-    return this.request('/auth/logout', {
+    return this.request('/api/auth/logout', {
       method: 'POST',
     });
   }
