@@ -26,8 +26,28 @@ app.use((req, res, next) => {
 });
 
 // CORS configuration
-app.use(cors({
-  origin: '*',  // Allow all origins
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  // In development, allow localhost
+  if (process.env.NODE_ENV === 'development' && origin === 'http://localhost:3000') {
+    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
+  } else {
+    // In production, only allow the Vercel frontend
+    res.setHeader('Access-Control-Allow-Origin', 'https://mern-otp-creative-recn.vercel.app');
+  }
+
+  // Match Vercel configuration
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));

@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://mern-otp-creative-recn.vercel.app/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://mern-otp-creative-recn.vercel.app';
 
 class ApiClient {
   async request(endpoint, options = {}) {
