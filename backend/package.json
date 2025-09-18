@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "description": "Backend for Email OTP Verification System",
   "main": "api/index.js",
+  "engines": {
+    "node": ">=14.0.0"
+  },
   "scripts": {
     "start": "node api/index.js",
     "dev": "nodemon api/index.js",
-    "vercel-build": "echo 'Building for Vercel...'"
+    "vercel-build": "echo 'Ready for serverless deployment'"
   },
   "keywords": [],
   "author": "",

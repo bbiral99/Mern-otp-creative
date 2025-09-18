@@ -2,8 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/authRoutes');
+require('dotenv').config();
 
 const app = express();
+
+// Vercel serverless function specific settings
+app.set('trust proxy', 1);
 
 // Middlewares
 app.use(express.json());
