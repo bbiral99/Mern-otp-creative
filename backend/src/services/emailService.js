@@ -12,12 +12,19 @@ class EmailService {
     console.log('📧 Initializing Email Service for Vercel...');
     console.log('📧 EMAIL_USER:', process.env.EMAIL_USER);
     console.log('📧 EMAIL_PASS configured:', !!process.env.EMAIL_PASS);
+    console.log('📧 EMAIL_PASS length:', process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0);
     console.log('📧 SENDGRID_API_KEY configured:', !!process.env.SENDGRID_API_KEY);
+    
+    // CRITICAL: Gmail app passwords must be without spaces!
+    if (process.env.EMAIL_PASS && process.env.EMAIL_PASS.includes(' ')) {
+      console.log('🚨 CRITICAL: EMAIL_PASS contains spaces! Gmail app passwords must be without spaces.');
+      console.log('🚨 Expected format: vsoxgqdjwfwkokjl (not: vsox gqdj wfwk okjl)');
+    }
     
     // Priority 1: Try Gmail SMTP first (as requested)
     this.initializeGmailSMTP();
     
-    // Priority 2: Initialize SendGrid as fallback
+    // Priority 2: Initialize SendGrid as fallback ONLY
     if (process.env.SENDGRID_API_KEY) {
       this.initializeSendGrid();
     } else {
@@ -27,7 +34,13 @@ class EmailService {
 
   initializeGmailSMTP() {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.log('⚠️  No Gmail credentials - SMTP unavailable');
+      console.log('⚠️  Gmail SMTP unavailable - missing credentials:');
+      console.log('⚠️  EMAIL_USER configured:', !!process.env.EMAIL_USER);
+      console.log('⚠️  EMAIL_PASS configured:', !!process.env.EMAIL_PASS);
+      if (process.env.EMAIL_USER && !process.env.EMAIL_PASS) {
+        console.log('🚨 CRITICAL: EMAIL_PASS (Gmail app password) not set in Vercel environment variables!');
+        console.log('🚨 Please add EMAIL_PASS to Vercel backend environment variables');
+      }
       return;
     }
 
@@ -36,6 +49,15 @@ class EmailService {
       console.log('📧 SMTP Host: smtp.gmail.com');
       console.log('📧 SMTP Port: 587');
       console.log('📧 SMTP User:', process.env.EMAIL_USER);
+      
+      // Clean the app password by removing any spaces (common mistake)
+      const cleanEmailPass = process.env.EMAIL_PASS.replace(/\s+/g, '');
+      console.log('📧 Original EMAIL_PASS length:', process.env.EMAIL_PASS.length);
+      console.log('📧 Cleaned EMAIL_PASS length:', cleanEmailPass.length);
+      
+      if (cleanEmailPass.length !== 16) {
+        console.log('⚠️  Warning: Gmail app password should be 16 characters. Current length:', cleanEmailPass.length);
+      }
 
       // Vercel-optimized Gmail SMTP configuration
       const transportConfig = {
@@ -45,7 +67,7 @@ class EmailService {
         requireTLS: true,
         auth: {
           user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS
+          pass: cleanEmailPass // Use cleaned password without spaces
         },
         // Vercel serverless optimizations
         connectionTimeout: 30000, // 30 seconds for Vercel cold starts
@@ -282,15 +304,25 @@ class EmailService {
 
   async testConnection() {
     console.log('🔍 Testing email service connection for Vercel...');
+    console.log('🔍 EMAIL_USER:', process.env.EMAIL_USER);
+    console.log('🔍 EMAIL_PASS configured:', !!process.env.EMAIL_PASS);
+    console.log('🔍 SENDGRID_API_KEY configured:', !!process.env.SENDGRID_API_KEY);
     
     // Test Gmail SMTP first
     if (this.transporter) {
       try {
+        console.log('🔍 Testing Gmail SMTP connection...');
         await this.transporter.verify();
         console.log('✅ Gmail SMTP connection verified!');
         return { success: true, method: 'gmail-smtp' };
       } catch (error) {
         console.error('❌ Gmail SMTP test failed:', error.message);
+        console.error('❌ Likely cause: EMAIL_PASS not set in Vercel environment');
+      }
+    } else {
+      console.log('❌ Gmail SMTP transporter not initialized');
+      if (!process.env.EMAIL_PASS) {
+        console.log('🚨 CRITICAL: EMAIL_PASS missing from Vercel environment variables!');
       }
     }
     
@@ -300,7 +332,7 @@ class EmailService {
       return { success: true, method: 'sendgrid-fallback' };
     }
     
-    throw new Error('No email service available');
+    throw new Error('No email service available - check EMAIL_PASS and SENDGRID_API_KEY environment variables');
   }
 
 }
