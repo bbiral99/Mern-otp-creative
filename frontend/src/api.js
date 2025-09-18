@@ -14,9 +14,15 @@ class ApiClient {
     console.log('🔧 API Request:', { url, config });
 
     try {
+      console.log('🚀 Making request to:', url);
       const response = await fetch(url, config);
       console.log('🔧 API Response Status:', response.status);
       console.log('🔧 API Response Headers:', response.headers);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Error response:', errorText);
+      }
       
       const data = await response.json();
       console.log('🔧 API Response Data:', data);

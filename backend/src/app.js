@@ -25,7 +25,7 @@ app.use((req, res, next) => {
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
-  'https://mern-otp-creative-recn.vercel.app', // Your frontend URL
+  'https://mern-otp-creative-it-frontend.vercel.app', // Your actual frontend URL
   process.env.CLIENT_URL,
   process.env.FRONTEND_URL
 ].filter(Boolean); // Remove undefined values
