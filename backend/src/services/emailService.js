@@ -70,16 +70,19 @@ class EmailService {
           pass: cleanEmailPass // Use cleaned password without spaces
         },
         // Vercel serverless optimizations
-        connectionTimeout: 30000, // 30 seconds for Vercel cold starts
-        greetingTimeout: 15000,    // 15 seconds for server greeting
-        socketTimeout: 30000,      // 30 seconds for socket operations
+        connectionTimeout: 60000, // 60 seconds for Vercel cold starts
+        greetingTimeout: 30000,    // 30 seconds for server greeting
+        socketTimeout: 60000,      // 60 seconds for socket operations
         pool: false,               // Disable pooling for serverless
         maxConnections: 1,         // Single connection for serverless
+        maxMessages: 1,            // One message per connection
         // Additional Vercel compatibility
         tls: {
-          ciphers: 'SSLv3',
-          rejectUnauthorized: true
+          rejectUnauthorized: true,
+          minVersion: 'TLSv1.2'
         },
+        // Enable detailed logging in development
+        logger: process.env.NODE_ENV === 'development',
         debug: process.env.NODE_ENV === 'development'
       };
 
@@ -306,18 +309,35 @@ class EmailService {
     console.log('🔍 Testing email service connection for Vercel...');
     console.log('🔍 EMAIL_USER:', process.env.EMAIL_USER);
     console.log('🔍 EMAIL_PASS configured:', !!process.env.EMAIL_PASS);
+    console.log('🔍 EMAIL_PASS length:', process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0);
     console.log('🔍 SENDGRID_API_KEY configured:', !!process.env.SENDGRID_API_KEY);
     
-    // Test Gmail SMTP first
+    // Test Gmail SMTP first with detailed diagnostics
     if (this.transporter) {
       try {
         console.log('🔍 Testing Gmail SMTP connection...');
-        await this.transporter.verify();
+        console.log('🔍 SMTP Config - Host: smtp.gmail.com, Port: 587');
+        console.log('🔍 Auth User:', process.env.EMAIL_USER);
+        
+        // Attempt connection with timeout
+        const verifyPromise = this.transporter.verify();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Connection timeout after 15 seconds')), 15000)
+        );
+        
+        await Promise.race([verifyPromise, timeoutPromise]);
         console.log('✅ Gmail SMTP connection verified!');
-        return { success: true, method: 'gmail-smtp' };
+        return { success: true, method: 'gmail-smtp', details: 'Connection successful' };
       } catch (error) {
         console.error('❌ Gmail SMTP test failed:', error.message);
-        console.error('❌ Likely cause: EMAIL_PASS not set in Vercel environment');
+        console.error('❌ Error code:', error.code);
+        console.error('❌ Error response:', error.response);
+        
+        if (error.code === 'EAUTH') {
+          console.error('🚨 AUTHENTICATION FAILED - Check EMAIL_PASS in Vercel environment');
+        } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNRESET') {
+          console.error('🚨 CONNECTION TIMEOUT - Vercel network issue or Gmail blocking');
+        }
       }
     } else {
       console.log('❌ Gmail SMTP transporter not initialized');
@@ -329,10 +349,10 @@ class EmailService {
     // Test SendGrid fallback
     if (this.sendgridConfigured) {
       console.log('✅ SendGrid available as fallback');
-      return { success: true, method: 'sendgrid-fallback' };
+      return { success: true, method: 'sendgrid-fallback', details: 'Gmail failed, using SendGrid' };
     }
     
-    throw new Error('No email service available - check EMAIL_PASS and SENDGRID_API_KEY environment variables');
+    throw new Error('No email service available - Gmail SMTP failed and no SendGrid configured');
   }
 
 }

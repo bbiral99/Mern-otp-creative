@@ -276,3 +276,56 @@ exports.testSendEmail = async (req, res) => {
 
 // Keep the old verifyOtp for backward compatibility
 exports.verifyOtp = exports.verifyOtpController;
+
+// Test Gmail SMTP specifically
+exports.testGmailSMTP = async (req, res) => {
+  try {
+    console.log('🧪 Testing Gmail SMTP directly...');
+    console.log('📧 EMAIL_USER:', process.env.EMAIL_USER);
+    console.log('📧 EMAIL_PASS configured:', !!process.env.EMAIL_PASS);
+    console.log('📧 EMAIL_PASS length:', process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0);
+    
+    // Force Gmail SMTP test
+    if (emailService.transporter) {
+      try {
+        console.log('🔍 Attempting Gmail SMTP verification...');
+        await emailService.transporter.verify();
+        console.log('✅ Gmail SMTP verification successful!');
+        
+        res.status(200).json({
+          message: 'Gmail SMTP connection successful',
+          service: 'gmail-smtp',
+          host: 'smtp.gmail.com',
+          port: 587,
+          user: process.env.EMAIL_USER,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('❌ Gmail SMTP verification failed:', error.message);
+        console.error('❌ Error details:', error);
+        
+        res.status(500).json({
+          message: 'Gmail SMTP connection failed',
+          error: error.message,
+          code: error.code,
+          response: error.response,
+          emailUser: process.env.EMAIL_USER,
+          emailPassLength: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0
+        });
+      }
+    } else {
+      console.log('❌ Gmail SMTP transporter not initialized');
+      res.status(500).json({
+        message: 'Gmail SMTP transporter not initialized',
+        emailPassConfigured: !!process.env.EMAIL_PASS,
+        emailUser: process.env.EMAIL_USER
+      });
+    }
+  } catch (error) {
+    console.error('❌ Gmail SMTP test failed:', error);
+    res.status(500).json({
+      message: 'Gmail SMTP test failed',
+      error: error.message
+    });
+  }
+};

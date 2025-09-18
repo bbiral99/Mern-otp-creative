@@ -31,4 +31,7 @@ router.get('/test-email', authController.testEmail);
 // Test send actual OTP email
 router.post('/test-send-email', authController.testSendEmail);
 
+// Test Gmail SMTP specifically
+router.get('/test-gmail-smtp', authController.testGmailSMTP);
+
 module.exports = router;
